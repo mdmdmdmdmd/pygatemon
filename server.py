@@ -23,24 +23,36 @@ def get_tokens():
         return None
 
 
-def handle_json(data):
+def check_json(data):
     try:
         json_data = json.loads(data)
     except:
         return False
     timestamp = json_data.get('timestamp', False)
-    if not timestamp:
+    uuidstr = json_data.get('uuid', False)
+    if not all((timestamp, uuidstr)):
         return False
     if int(timestamp) - int(time.time()) > 90:
-        return False
-    uuidstr = json_data.get('uuid', False)
-    if not uuidstr:
         return False
     try:
         uuid.UUID(uuidstr, version=5)
     except ValueError:
         return False
     return True
+
+
+def store_data(data):
+    createtable = 'CREATE TABLE IF NOT EXIST {} ({})'
+    insert = 'INSERT INTO {}({}) values ({})'
+    con = sqlite3.connect('data.db', )
+    con.row_factory = sqlite3.Row
+    json_data = json.loads(data)
+    with con:
+        con.execute(createtable.format('gatemon', 'index INTEGER, uuid TEXT, addrv4 INTEGER, addrv6 INTEGER,'
+                                                  'dnsv4 INTEGER, dnsv6 INTEGER, ulv4 INTEGER, ulv6 INTEGER'))
+        for host in json_data['hosts']:
+            con.execute(insert.format())
+            # TODO: finish this
 
 
 class ThreadingSimpleServer(ThreadingMixIn, http.server.HTTPServer):
@@ -55,9 +67,13 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(b'400: Malformed POST data?')
             return
         post_data = self.rfile.read(content_length)
-        if not handle_json(post_data):
+        if not check_json(post_data):
             self.send_response(400)
             self.wfile.write(b'400: Malformed JSON data?')
+            return
+        if not store_data(post_data):
+            self.send_response(400)
+            self.wfile.write(b'400: Error in database.')
             return
         self.send_response(200)
         self.wfile.write(b'200: Data stored.')
@@ -82,7 +98,7 @@ def main():
         print('Missing host/port settings.')
         return
     server = ThreadingSimpleServer((host, port), MyHandler)
-    print('Started http server')
+    print('Started http server.')
     try:
         server.socket = ssl.wrap_socket(server.socket, keyfile='key.pem', certfile='cert.pem', server_side=True)
         server.serve_forever()
