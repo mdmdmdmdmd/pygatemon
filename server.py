@@ -42,17 +42,31 @@ def check_json(data):
 
 
 def store_data(data):
-    createtable = 'CREATE TABLE IF NOT EXIST {} ({})'
-    insert = 'INSERT INTO {}({}) values ({})'
+    createtable = 'CREATE TABLE IF NOT EXISTS gatemon (id INTEGER PRIMARY KEY, uuid TEXT, name TEXT, host TEXT, ' \
+                  'addrv4 INTEGER, addrv6 INTEGER, dnsv4 INTEGER, dnsv6 INTEGER, ulv4 INTEGER, ulv6 INTEGER)'
+    insert = 'INSERT INTO gatemon(uuid, name, host, addrv4, addrv6, dnsv4, dnsv6, ulv4, ulv6) values ' \
+             '(?, ?, ? ,? ,? ,? ,? ,? ,?)'
     con = sqlite3.connect('data.db', )
     con.row_factory = sqlite3.Row
     json_data = json.loads(data)
+    timestamp = json_data['timestamp']
+    uuidstr = json_data['uuid']
+    name = json_data['name']
     with con:
-        con.execute(createtable.format('gatemon', 'index INTEGER, uuid TEXT, addrv4 INTEGER, addrv6 INTEGER,'
-                                                  'dnsv4 INTEGER, dnsv6 INTEGER, ulv4 INTEGER, ulv6 INTEGER'))
+        con.execute(createtable)
         for host in json_data['hosts']:
-            con.execute(insert.format())
-            # TODO: finish this
+            hostname = host['host']
+            addrv4 = host['addrv4']
+            addrv6 = host['addrv6']
+            dnsv4 = host['dnsv4']
+            dnsv6 = host['dnsv6']
+            ulv4 = host['ulv4']
+            ulv6 = host['ulv6']
+            try:
+                con.execute(insert, (uuidstr, name, hostname, addrv4, addrv6, dnsv4, dnsv6, ulv4, ulv6))
+            except:
+                return False
+    return True
 
 
 class ThreadingSimpleServer(ThreadingMixIn, http.server.HTTPServer):
