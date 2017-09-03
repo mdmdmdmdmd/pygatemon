@@ -7,17 +7,9 @@ import uuid
 import sqlite3
 
 
-def get_settings():
+def get_json(filename):
     try:
-        with open('settings.json', 'r') as file:
-            return json.load(file)
-    except:
-        return None
-
-
-def get_tokens():
-    try:
-        with open('tokens.json', 'r') as file:
+        with open(filename, 'r') as file:
             return json.load(file)
     except:
         return None
@@ -46,7 +38,7 @@ def store_data(data):
                   'addrv4 INTEGER, addrv6 INTEGER, dnsv4 INTEGER, dnsv6 INTEGER, ulv4 INTEGER, ulv6 INTEGER)'
     insert = 'INSERT INTO gatemon(uuid, name, host, addrv4, addrv6, dnsv4, dnsv6, ulv4, ulv6) values ' \
              '(?, ?, ? ,? ,? ,? ,? ,? ,?)'
-    con = sqlite3.connect('data.db', )
+    con = sqlite3.connect('data.db')
     con.row_factory = sqlite3.Row
     json_data = json.loads(data)
     timestamp = json_data['timestamp']
@@ -75,34 +67,52 @@ class ThreadingSimpleServer(ThreadingMixIn, http.server.HTTPServer):
 
 class MyHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
+        tokens = get_json('tokens.json')
+        token = self.headers.get('X-gatemon-token')
+        if token is None:
+            self.send_response(403)
+            self.end_headers()
+            self.wfile.write(b'403: No token.')
+            return
+        if token not in tokens:
+            self.send_response(403)
+            self.end_headers()
+            self.wfile.write(b'403: Wrong token.')
+            return
         content_length = int(self.headers['Content-Length'])
         if content_length < 10:
             self.send_response(400)
+            self.end_headers()
             self.wfile.write(b'400: Malformed POST data?')
             return
         post_data = self.rfile.read(content_length)
         if not check_json(post_data):
             self.send_response(400)
+            self.end_headers()
             self.wfile.write(b'400: Malformed JSON data?')
             return
         if not store_data(post_data):
             self.send_response(400)
+            self.end_headers()
             self.wfile.write(b'400: Error in database.')
             return
         self.send_response(200)
+        self.end_headers()
         self.wfile.write(b'200: Data stored.')
 
     def do_GET(self):
         self.send_response(404)
+        self.end_headers()
         return
 
     def do_HEAD(self):
         self.send_response(404)
+        self.end_headers()
         return
 
 
 def main():
-    settings = get_settings()
+    settings = get_json('settings.json')
     if settings is None:
         print('Something is wrong with the settings file.')
         return
