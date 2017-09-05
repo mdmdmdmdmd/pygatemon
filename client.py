@@ -17,7 +17,6 @@ CHECKH = 'sn0{}.s.ffh.zone'
 CHECK4 = '10.2.{}0.1'
 CHECK6 = 'fdca:ffee:8::{}001'
 RANGE = [1, 2, 4, 5, 7, 8, 9]
-DEVICE = 'bat0'
 
 
 def check_dns(hostname, nameserver):
@@ -31,15 +30,16 @@ def check_dns(hostname, nameserver):
     return result4[0], result6[0]
 
 
-def check_uplink(ipv6, fetchip, checkip, device, fetchhost):
+def check_uplink(ipv6, fetchip, checkip, fetchhost):
     netmask = '32'
     if ipv6:
         netmask = '128'
     url = 'http://{}'.format(fetchip)
     headers = {'Host': fetchhost}
     ip = IPRoute()
-    iface = ip.link_lookup(ifname=device)[0]
-    ip.route('add', dst='{}/{}'.format(fetchip, netmask), gateway=checkip, oif=iface)
+    # get output interface from ip route get
+    oif = next(filter(lambda x: x[0] == 'RTA_OIF', ip.route('get', dst=checkip)[0]['attrs']))[1]
+    ip.route('add', dst='{}/{}'.format(fetchip, netmask), gateway=checkip, oif=oif)
     request = urllib.request.Request(url, method='GET', headers=headers)
     try:
         urllib.request.urlopen(request)
@@ -47,7 +47,7 @@ def check_uplink(ipv6, fetchip, checkip, device, fetchhost):
         result = False
     else:
         result = True
-    ip.route('del', dst='{}/{}'.format(fetchip, netmask), gateway=checkip, oif=iface)
+    ip.route('del', dst='{}/{}'.format(fetchip, netmask), gateway=checkip, oif=oif)
     return result
 
 
@@ -59,10 +59,10 @@ def main():
         fetchip4, fetchip6 = check_dns(FETCH, CHECK4.format(host))
         if fetchip4:
             flags['dnsv4'] = True
-            flags['ulv4'] = check_uplink(False, fetchip4, CHECK4.format(host), DEVICE, FETCH)
+            flags['ulv4'] = check_uplink(False, fetchip4, CHECK4.format(host), FETCH)
         if fetchip6:
             flags['dnsv6'] = True
-            flags['ulv6'] = check_uplink(True, fetchip6, CHECK6.format(host), DEVICE, FETCH)
+            flags['ulv6'] = check_uplink(True, fetchip6, CHECK6.format(host), FETCH)
         hosts.append({
             'host': hostname,
             'addrv4': flags['addrv4'],
