@@ -1,0 +1,2 @@
+dnspython==1.15.0
+pyroute2==0.4.21
