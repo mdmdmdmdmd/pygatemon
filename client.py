@@ -73,7 +73,7 @@ def main():
             'ulv6': flags['ulv6']
         })
     name = socket.gethostname()
-    uuidstr = uuid.uuid5(uuid.NAMESPACE_DNS, name)
+    uuidstr = str(uuid.uuid5(uuid.NAMESPACE_DNS, name))
     timestamp = int(time.time())
     data = {
         'timestamp': timestamp,
