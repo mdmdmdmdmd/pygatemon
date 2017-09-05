@@ -27,7 +27,7 @@ def check_dns(hostname, nameserver):
         result4 = resolver.query(hostname, dns.rdatatype.A)
         result6 = resolver.query(hostname, dns.rdatatype.AAAA)
     except:
-        return False
+        return False, False
     return result4[0], result6[0]
 
 
