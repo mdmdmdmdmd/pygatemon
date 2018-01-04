@@ -1,0 +1,8 @@
+{
+  "influx": "influxdb://username:password@influxhost:8086/dbname",
+  "fetch": "meineip.moritzrudert.de",
+  "check": "sn0{}",
+  "check4": "10.2.{}0.1",
+  "check6": "fdca:ffee:8::{}001",
+  "nodes": [1, 2, 4, 5, 7, 8, 9]
+}
