@@ -68,7 +68,6 @@ def check_uplink(ipv6, fetchip, checkip, fetchhost):
 def check_dhcp(interface, server):
     ip = IPRoute()
     client = ip.get_addr(label=interface)[0]['attrs'][0][1]
-    client = ''
     conf.iface = interface
     hwaddr = bytes(get_if_raw_hwaddr(conf.iface))
     dhcp_discover = Ether() / \
@@ -84,9 +83,6 @@ def check_dhcp(interface, server):
     if dhcp_offer is None:
         return False
     else:
-        print(dhcp_offer.sprintf('%DHCP.options%'))
-        print(dhcp_offer.yiaddr)
-        print(dhcp_offer.siaddr)
         if '10.2.' in dhcp_offer.yiaddr:
             return True
         else:
