@@ -1,11 +1,12 @@
 import json
 import socket
 import urllib.request
-import influxdb
 
+import influxdb
 import dns.resolver
 import dns.inet
 from pyroute2 import IPRoute
+from scapy.all import conf, get_if_raw_hwaddr, Ether, IP, UDP, BOOTP, DHCP, srp1
 
 
 def get_json(filename):
@@ -16,9 +17,8 @@ def get_json(filename):
         return None
 
 
-def create_json(hostname, montype, sn, value):
+def create_json(hostname, montype, supernode, value):
     measurement = 'nodemonitoring_{}'.format(montype)
-    supernode = 'sn0{}'.format(sn)
     json_body = {
         "measurement": measurement,
         "tags": {
@@ -65,26 +65,56 @@ def check_uplink(ipv6, fetchip, checkip, fetchhost):
     return result
 
 
+def check_dhcp(interface, server):
+    ip = IPRoute()
+    client = ip.get_addr(label=interface)[0]['attrs'][0][1]
+    client = ''
+    conf.iface = interface
+    hwaddr = bytes(get_if_raw_hwaddr(conf.iface))
+    dhcp_discover = Ether() / \
+                    IP(dst=server) / \
+                    UDP(dport=67, sport=68) / \
+                    BOOTP(chaddr=hwaddr) / \
+                    DHCP(options=[
+                        ('message-type', 'request'),
+                        ('requested_addr', client),
+                        'end'
+                    ])
+    dhcp_offer = srp1(dhcp_discover, timeout=5, verbose=False)
+    if dhcp_offer is None:
+        return False
+    else:
+        print(dhcp_offer.sprintf('%DHCP.options%'))
+        print(dhcp_offer.yiaddr)
+        print(dhcp_offer.siaddr)
+        if '10.2.' in dhcp_offer.yiaddr:
+            return True
+        else:
+            return False
+
+
 def main():
     config = get_json('client.json')
     if config is None:
         print('There is no config file.')
-        return
+        return False
     try:
         influx = config['influx']
         fetch = config['fetch']
-        checkh = config['checkh']
+        check = config['check']
         check4 = config['check4']
         check6 = config['check6']
         nodes = config['nodes']
+        device = config['device']
     except KeyError:
         print('Malformed config file.')
-        return
+        return False
     tester = socket.gethostname()
     influxcli = influxdb.InfluxDBClient.from_dsn(dsn=influx, timeout=30)
     points = []
     for node in nodes:
-        name = checkh.format(node)
+        name = check.format(node)
+        print(name)
         fetchip4, fetchip6 = check_dns(fetch, check4.format(node))
         if fetchip4:
             points.append(create_json(tester, 'dnsv4', name, True))
@@ -98,7 +128,11 @@ def main():
         else:
             points.append(create_json(tester, 'dnsv6', name, False))
             points.append(create_json(tester, 'ulv6', name, False))
-    influxcli.write_points(points=points, protocol='json')
+        points.append(create_json(tester, 'dhcp', name, check_dhcp(device, check4.format(node))))
+    if influxcli.write_points(points=points, protocol='json'):
+        return True
+    else:
+        return False
 
 
 if __name__ == '__main__':
