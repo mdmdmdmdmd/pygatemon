@@ -27,7 +27,8 @@ def create_json(hostname, montype, supernode, value):
             "domain": "default"
         },
         "fields": {
-            "Bool_value": value
+            "Bool_value": value,
+            "Int_value": int(value)
         }
     }
     return json_body
